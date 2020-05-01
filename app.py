@@ -20,7 +20,14 @@ pusher_client = pusher.Pusher(
   ssl=True
 )
 
-deck = Deck()
+@app.route("/pusher/auth", methods=['POST'])
+def pusher_authentication():
+    # pusher_client is obtained through pusher.Pusher( ... )
+    auth = pusher_client.authenticate(
+        channel=request.form['channel_name'],
+        socket_id=request.form['socket_id']
+    )
+    return json.dumps(auth)
 
 @app.route('/')
 def home():
@@ -34,7 +41,10 @@ def blackjackAction(sessionID):
             return jsonify({'status' : 'success'})
         elif data['action'] == 'stay':
             return jsonify({'status' : 'success'})
-        # pusher_client.trigger(session, 'card-played', {'action': _action})
+        elif data['action'] == 'new_game':
+            deck = Deck()
+            pusher_client.trigger(sessionID, 'new-deck', deck.get_shuffled_deck())
+            return jsonify({'status' : 'success'})
     except:
         return jsonify({'status':'failed'})
 

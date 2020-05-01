@@ -9,12 +9,18 @@ Black Jack
 <script type="text/javascript">
 	var sessionID = '{{ sessionID }}';
 	var channel = pusher.subscribe(sessionID);
+	var membersChannel = pusher.subscribe('presence-'+sessionID);
+
+	var deck;
+	channel.bind('new-deck', (data) => {
+		deck = data;
+	});
 
 	$(() => {
 		$('#hit-btn').on('click', () => {
 			let url = '/blackjack/action/' + sessionID;
 			let dataType = 'json';
-			let data = JSON.stringify({'action':'hit'});
+			let data = JSON.stringify({'action':'new_game'});
 			$.ajax({
 		        type: "POST", 
 		        url: url, //localhost Flask

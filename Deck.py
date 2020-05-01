@@ -138,8 +138,14 @@ class Deck():
 	def convert_external_card_to_int(self, card):
 		return self.map_card_to_number_value(card)
 
-	def get_deck_dict(self):
+	def get_deck_dict(self, deck_array):
 		result = dict()
-		for card in self.deck_array:
-			result.update({self.map_card_to_number_value(card) : card})
+		counter = 0
+		for card in deck_array:
+			result[counter] = {self.map_card_to_number_value(card) : card}
+			counter = counter + 1
 		return result
+
+	def get_shuffled_deck(self):
+		self.shuffle_deck()
+		return self.get_deck_dict(self.deck_array)
