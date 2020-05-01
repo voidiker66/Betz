@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}
+Black Jack
+{% endblock %}
+
+{% block additionalScripts %}
+<script type="text/javascript" src="{{ url_for('static', filename='js/blackjack.js') }}"></script>
+<script type="text/javascript">
+	var sessionID = '{{ sessionID }}';
+	var channel = pusher.subscribe(sessionID);
+
+	$(() => {
+		$('#hit-btn').on('click', () => {
+			let url = '/blackjack/action/' + sessionID;
+			let dataType = 'json';
+			let data = JSON.stringify({'action':'hit'});
+			$.ajax({
+		        type: "POST", 
+		        url: url, //localhost Flask
+		        data : JSON.stringify(data),
+		        contentType: "application/json",
+		    });
+		})
+		$('#stay-btn').on('click', () => {
+			let url = '/blackjack/action/' + sessionID;
+			let dataType = 'json';
+			let data = JSON.stringify({'action':'stay'});
+			$.ajax({
+		        type: "POST", 
+		        url: url, //localhost Flask
+		        data : JSON.stringify(data),
+		        contentType: "application/json",
+		    });
+		})
+	})
+	
+</script>
+{% endblock %}
+
+{% block body %}
+
+	<input type="submit" id="hit-btn">Hit</input>
+	<input type="submit" id="stay-btn">Stay</input>
+
+{% endblock %}
