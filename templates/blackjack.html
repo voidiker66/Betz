@@ -10,17 +10,38 @@ Black Jack
 	var sessionID = '{{ sessionID }}';
 	var channel = pusher.subscribe(sessionID);
 	var membersChannel = pusher.subscribe('presence-'+sessionID);
-
+	var cardsDict = {};
 	var deck;
+	var deckPointer = 0;
+	var playerOrder;
+
+	function shuffle(a) {
+	    for (let i = a.length - 1; i > 0; i--) {
+	        const j = Math.floor(Math.random() * (i + 1));
+	        [a[i], a[j]] = [a[j], a[i]];
+	    }
+	    return a;
+	}
+
 	channel.bind('new-deck', (data) => {
 		deck = data;
+		playerOrder = Object.keys(membersChannel.members.members);
+		shuffle(playerOrder);	
+	});
+	channel.bind('player-hit', (data) => {
+		let player = data['player']['id'];
+		cardsDict[player] = deck[deckPointer];
+		deckPointer++;
+	});
+	channel.bind('player-stay', (data) => {
+		console.log(data);
 	});
 
 	$(() => {
 		$('#hit-btn').on('click', () => {
 			let url = '/blackjack/action/' + sessionID;
 			let dataType = 'json';
-			let data = JSON.stringify({'action':'new_game'});
+			let data = JSON.stringify({'action':'hit', 'player':membersChannel.members.me});
 			$.ajax({
 		        type: "POST", 
 		        url: url, //localhost Flask
@@ -39,6 +60,17 @@ Black Jack
 		        contentType: "application/json",
 		    });
 		})
+		$('#new-deck-btn').on('click', () => {
+			let url = '/blackjack/action/' + sessionID;
+			let dataType = 'json';
+			let data = JSON.stringify({'action':'new_game'});
+			$.ajax({
+		        type: "POST", 
+		        url: url, //localhost Flask
+		        data : JSON.stringify(data),
+		        contentType: "application/json",
+		    });
+		})
 	})
 	
 </script>
@@ -46,7 +78,22 @@ Black Jack
 
 {% block body %}
 
+	<input type="submit" id="new-deck-btn">New Game</input>
 	<input type="submit" id="hit-btn">Hit</input>
 	<input type="submit" id="stay-btn">Stay</input>
+
+	<div class="w-full">
+		<div class="w-24 inline-block m-4">
+			<div class="max-w-sm rounded overflow-hidden shadow-lg">
+					<img class="w-full" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Playing_card_heart_A.svg/1200px-Playing_card_heart_A.svg.png" alt="Sunset in the mountains">
+			</div>
+		</div>
+		<div class="w-24 inline-block m-4">
+			<div class="max-w-sm rounded overflow-hidden shadow-lg">
+					<img class="w-full" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Playing_card_heart_A.svg/1200px-Playing_card_heart_A.svg.png" alt="Sunset in the mountains">
+			</div>
+		</div>
+
+	</div>
 
 {% endblock %}

@@ -25,7 +25,8 @@ def pusher_authentication():
     # pusher_client is obtained through pusher.Pusher( ... )
     auth = pusher_client.authenticate(
         channel=request.form['channel_name'],
-        socket_id=request.form['socket_id']
+        socket_id=request.form['socket_id'],
+        custom_data={'user_id':request.form['socket_id']} # temp because I have no idea how to create new users - this will create new user on each page refresh
     )
     return json.dumps(auth)
 
@@ -38,8 +39,10 @@ def blackjackAction(sessionID):
     try:
         data = json.loads(request.json)
         if data['action'] == 'hit':
+            pusher_client.trigger(sessionID, 'player-hit', {'player':data['player']})
             return jsonify({'status' : 'success'})
         elif data['action'] == 'stay':
+            pusher_client.trigger(sessionID, 'player-stay')
             return jsonify({'status' : 'success'})
         elif data['action'] == 'new_game':
             deck = Deck()
