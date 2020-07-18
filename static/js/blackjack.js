@@ -22,7 +22,7 @@ channel.bind('new-deck', (data) => {
 });
 channel.bind('player-hit', (data) => {
 	let player = data['player']['id'];
-	cardsDict[player] = deck[deckPointer];
+	cardsDict[player] = deck[sessionID][deckPointer];
 	deckPointer++;
 });
 channel.bind('player-stay', (data) => {
