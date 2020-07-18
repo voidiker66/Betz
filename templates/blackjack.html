@@ -5,101 +5,29 @@ Black Jack
 {% endblock %}
 
 {% block additionalScripts %}
-<script type="text/javascript" src="{{ url_for('static', filename='js/blackjack.js') }}"></script>
 <script type="text/javascript">
 	var sessionID = '{{ sessionID }}';
-	var channel = pusher.subscribe(sessionID);
-	var membersChannel = pusher.subscribe('presence-'+sessionID);
-	var cardsDict = {};
-	var deck;
-	var deckPointer = 0;
-	var playerOrder;
-
-	function shuffle(a) {
-	    for (let i = a.length - 1; i > 0; i--) {
-	        const j = Math.floor(Math.random() * (i + 1));
-	        [a[i], a[j]] = [a[j], a[i]];
-	    }
-	    return a;
-	}
-
-	channel.bind('new-deck', (data) => {
-		deck = data;
-		playerOrder = Object.keys(membersChannel.members.members);
-		shuffle(playerOrder);	
-	});
-	channel.bind('player-hit', (data) => {
-		let player = data['player']['id'];
-		cardsDict[player] = deck[deckPointer];
-		deckPointer++;
-	});
-	channel.bind('player-stay', (data) => {
-		console.log(data);
-	});
-
-	$(() => {
-		$('#hit-btn').on('click', () => {
-			let url = '/blackjack/action/' + sessionID;
-			let dataType = 'json';
-			let data = JSON.stringify({'action':'hit', 'player':membersChannel.members.me});
-			$.ajax({
-		        type: "POST", 
-		        url: url, //localhost Flask
-		        data : JSON.stringify(data),
-		        contentType: "application/json",
-		    });
-		})
-		$('#stay-btn').on('click', () => {
-			let url = '/blackjack/action/' + sessionID;
-			let dataType = 'json';
-			let data = JSON.stringify({'action':'stay'});
-			$.ajax({
-		        type: "POST", 
-		        url: url, //localhost Flask
-		        data : JSON.stringify(data),
-		        contentType: "application/json",
-		    });
-		})
-		$('#new-deck-btn').on('click', () => {
-			let url = '/blackjack/action/' + sessionID;
-			let dataType = 'json';
-			let data = JSON.stringify({'action':'new_game'});
-			$.ajax({
-		        type: "POST", 
-		        url: url, //localhost Flask
-		        data : JSON.stringify(data),
-		        contentType: "application/json",
-		    });
-		})
-	})
-	
+	var cardDisplayImage = "{{ url_for('static', filename='images/card-back.png') }}";
 </script>
+<script type="text/javascript" src="{{ url_for('static', filename='js/blackjack.js') }}"></script>
 {% endblock %}
 
 {% block body %}
 
-	<button id="new-deck-btn" class="w-32 bg-transparent hover:bg-blue-400 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-400 hover:border-transparent rounded cursor-pointer" href="/blackjack">
-			  New Game
-	</button>
-	<button id="hit-btn" class="w-32 bg-transparent hover:bg-green-400 text-green-700 font-semibold hover:text-white py-2 px-4 border border-green-400 hover:border-transparent rounded cursor-pointer" href="/blackjack">
-			  Hit
-	</button>
-	<button id="stay-btn" class="w-32 bg-transparent hover:bg-red-400 text-red-700 font-semibold hover:text-white py-2 px-4 border border-red-400 hover:border-transparent rounded cursor-pointer" href="/blackjack">
-			  Stay
-	</button>
+	<div class="w-full" id="game-control">
+		<button id="new-deck-btn" class="w-32 bg-transparent hover:bg-blue-400 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-400 hover:border-transparent rounded cursor-pointer" href="/blackjack">
+				  New Game
+		</button>
+		<button id="hit-btn" class="w-32 bg-transparent hover:bg-green-400 text-green-700 font-semibold hover:text-white py-2 px-4 border border-green-400 hover:border-transparent rounded cursor-pointer" href="/blackjack">
+				  Hit
+		</button>
+		<button id="stay-btn" class="w-32 bg-transparent hover:bg-red-400 text-red-700 font-semibold hover:text-white py-2 px-4 border border-red-400 hover:border-transparent rounded cursor-pointer" href="/blackjack">
+				  Stay
+		</button>
+	</div>
 
 	<div class="w-full">
-		<div class="w-24 inline-block m-4">
-			<div class="max-w-sm rounded overflow-hidden shadow-lg">
-					<img class="w-full" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Playing_card_heart_A.svg/1200px-Playing_card_heart_A.svg.png" alt="Sunset in the mountains">
-			</div>
-		</div>
-		<div class="w-24 inline-block m-4">
-			<div class="max-w-sm rounded overflow-hidden shadow-lg">
-					<img class="w-full" src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Playing_card_heart_A.svg/1200px-Playing_card_heart_A.svg.png" alt="Sunset in the mountains">
-			</div>
-		</div>
-
+		<div id="game-display"></div>
 	</div>
 
 {% endblock %}
