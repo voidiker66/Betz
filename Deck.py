@@ -142,7 +142,7 @@ class Deck():
 		result = dict()
 		counter = 0
 		for card in deck_array:
-			result[counter] = {self.map_card_to_number_value(card) : card}
+			result[counter] = {'value':self.map_card_to_number_value(card),'text': card}
 			counter = counter + 1
 		return result
 

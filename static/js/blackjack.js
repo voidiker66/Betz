@@ -14,6 +14,23 @@ function shuffle(a) {
     return a;
 }
 
+// animation for when a card is dealt to a player
+function dealCard(playerID) {
+	let newcard = document.createElement('img');
+	newcard.className += ' card card-deal';
+	newcard.src = cardDisplayImage;
+	// We need to change the translate parameter based on how many players are playing and where the player is shown
+	document.getElementById('game-display').appendChild(newcard);
+	setTimeout(() => {
+		newcard.style.transform = 'translate(2em)';
+	}, 200);
+}
+
+// TODO - calculate who won the round
+function handleEndGame() {
+
+}
+
 channel.bind('new-deck', (data) => {
 	deck[sessionID] = data;
 	playerOrder = Object.keys(membersChannel.members.members);
@@ -22,11 +39,16 @@ channel.bind('new-deck', (data) => {
 });
 channel.bind('player-hit', (data) => {
 	let player = data['player']['id'];
-	cardsDict[player] = deck[sessionID][deckPointer];
+	if (! cardsDict[player]) {
+		cardsDict[player] = [ ];
+	}
+	cardsDict[player].push(deck[sessionID][deckPointer]);
 	deckPointer++;
 });
 channel.bind('player-stay', (data) => {
 	if (playerPointer == (playerOrder.length - 1)) {
+		// Trigger the end game handler
+		handleEndGame();
 		playerPointer = 0;
 	} else {
 		playerPointer++;
@@ -35,18 +57,6 @@ channel.bind('player-stay', (data) => {
 });
 
 $(() => {
-	// animation for when a card is dealt to a player
-	function dealCard(playerID) {
-		let newcard = document.createElement('img');
-		newcard.className += ' card card-deal';
-		newcard.src = cardDisplayImage;
-		// We need to change the translate parameter based on how many players are playing and where the player is shown
-		document.getElementById('game-display').appendChild(newcard);
-		setTimeout(() => {
-			newcard.style.transform = 'translate(2em)';
-		}, 200);
-	}
-
 	$('#hit-btn').on('click', () => {
 		let url = '/blackjack/action/' + sessionID;
 		let dataType = 'json';
