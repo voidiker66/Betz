@@ -1,8 +1,10 @@
+from collections import deque
+
 import numpy as np
 import torch
-import torch.nn.functional as F
 
 from Player import Player
+from NeuralNetworks import Cuore, Gioco
 
 
 
@@ -108,17 +110,33 @@ class CardGame():
 
 class Hearts(CardGame):
     
-    def __init__(self):
+    def __init__(self,train=False):
         super().__init__((4,13),13,4)
         
+        self.train = train
         self.hearts_broken = False
         self.first_round = True
         self.shoot_the_moon = None
+        self.MAX_MEM_LEN = 100000
+        self.MIN_MEM_LEN = 10000
+        self.EPSILON = 0.9
+        
+        self.memory = deque([], maxlen=self.MAX_MEM_LEN)
+        
+        self.strat_nnet = Gioco()
         
         for player in self.playerlist:
             
             player.hearts = 0
             player.queen_of_spades = 0
+            
+            player.response_nnet = Cuore()
+            player.best_response_nnet = Cuore()
+            
+            player.memory = deque([], maxlen=self.MAX_MEM_LEN)
+            player.train_examples = []
+
+            
         
         
     def game_specific_reset(self):
@@ -126,6 +144,12 @@ class Hearts(CardGame):
         self.hearts_broken = False
         self.first_round = True
         self.shoot_the_moon = None
+
+        if self.train:
+
+            for player in self.playerlist:
+
+                player.points = 0
         
         
     def check_for_2clubs(self):
@@ -140,7 +164,7 @@ class Hearts(CardGame):
         return None
     
     
-    def choose_card(self,player):
+    def choose_card(self,player): #fix this for hearts broken logic
         
         
         if player.human:
@@ -197,17 +221,90 @@ class Hearts(CardGame):
             
         while np.sum(self.table)<self.numplayers:
             
+            if self.train==False:
+                
+                a,b = self.choose_card(self.playerlist[self.turn])
+                
+            else:
+                
+                game_state, mask, memory = self.nnet_input()
+                
+                with torch.no_grad():
+                    output = self.playerlist[self.turn].response_nnet(game_state,memory)*mask
+                
+
+                prediction = output / torch.sum(output)
+                prediction = prediction.squeeze().numpy()
+                
+               
+
+
+                
+                if np.random.uniform(0,1)<self.EPSILON:
+                    
+
+
+                    choice = np.random.choice(52,p=prediction)
+                    a,b = int(choice/13), choice%13
+
+
+                    
+                    
+                    
+                
+                else:
+
+
+                    
+                    choice = np.argmax(prediction)
+                    a,b = int(choice/13), choice%13
+
+                    action = torch.zeros((1,52))
+                    action[0,choice] = 1
+                    self.memory.append([game_state,memory,action])
+                
+                action = torch.zeros((1,52))
+                action[0,choice] = 1
+ 
+
+                if len(self.playerlist[self.turn].train_examples)>0:
+                    
+                    self.playerlist[self.turn].train_examples[-1][4] = torch.max(output)
+                                
+
+
+
+                if len(self.playerlist[self.turn].train_examples)<12:
+                
+                    self.playerlist[self.turn].train_examples.append([
+                                    game_state
+                                    ,memory
+                                    ,action
+                                    ,None # reward
+                                    ,None # max q'
+                                    ])     
+                
+
             
-            a,b = self.choose_card(self.playerlist[self.turn])
+#             self.record_history(a,b)
             
-            self.record_history(a,b)
-            
+                      
             if self.suit==None:
                 
                 self.suit = a
+                
+
         
             self.playerlist[self.turn].hand[a,b] = 0
             self.table[a,b] = 1
+            
+            
+            if self.hearts_broken==False:
+                
+                
+                if np.sum(self.table[2])>0:
+                    
+                    self.hearts_broken = True
             
             if a==self.suit:
                 
@@ -268,10 +365,19 @@ class Hearts(CardGame):
                 
                 player.points += player.round_points
                 
+        if self.train:      
+            
+            for player in self.playerlist:
+                    
+                for x in player.train_examples:
+
+                    player.memory.append([x[0],x[1],x[2],torch.tensor((26-player.round_points)/13),x[4]])
+                
+                
     def record_history(self,a,b):
         
         game_state = [player.reserve.copy() for player in self.playerlist]
-        game_state.append(game.table.copy())
+        game_state.append(self.table.copy())
         
         card_played = np.zeros((4,13))
         card_played[a,b] = 1
@@ -287,8 +393,21 @@ class Hearts(CardGame):
         
         if self.suit==None:
             
-            return torch.reshape(torch.tensor(mask),(1,-1))
+            if self.hearts_broken or np.sum(self.playerlist[self.turn].hand[2])==np.sum(self.playerlist[self.turn].hand):
+                
+                return torch.reshape(torch.tensor(mask),(1,-1))
+            
+            else:
+                
+                mask[2] = 0
+                
+                return torch.reshape(torch.tensor(mask),(1,-1))
         
+        
+        elif np.sum(self.playerlist[self.turn].hand[self.suit])==0:
+            
+            return torch.reshape(torch.tensor(mask),(1,-1))
+                  
         else:
             
             mask[:self.suit] = 0
@@ -307,9 +426,9 @@ class Hearts(CardGame):
 
     def nnet_input(self):
     
-        game_state = [game.playerlist[(i+game.turn)%game.numplayers].reserve.copy() for i in range(game.numplayers)]
-        game_state.append(game.playerlist[game.turn].hand.copy())
-        game_state.append(game.table.copy())
+        game_state = [self.playerlist[(i+self.turn)%self.numplayers].reserve.copy() for i in range(self.numplayers)]
+        game_state.append(self.playerlist[self.turn].hand.copy())
+        game_state.append(self.table.copy())
         
         memory = self.recall_history()
         game_state.append(memory) #get rid of this once RNN is up and running
@@ -318,10 +437,3 @@ class Hearts(CardGame):
         mask = self.get_mask()
         
         return game_state, mask, memory
-            
-            
-        
-        
-        
-                
-        

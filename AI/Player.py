@@ -21,6 +21,7 @@ class Player():
         self.hand = np.zeros(self.deckshape)
         self.reserve = np.zeros(self.deckshape)
 
+        
         """
             Reset handles the bare basics of ending a round and setting it up for the next one.
             It doesn't deal out new cards but it clears away all cards from the hand or reserve.
@@ -31,6 +32,7 @@ class Player():
         
         self.cards = 0
         self.round_points = 0
+
         
         self.hand = np.zeros(self.deckshape)
         self.reserve = np.zeros(self.deckshape)
