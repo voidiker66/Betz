@@ -17,7 +17,7 @@ class GameMemoryDataset(Dataset):
         item = self.data[index]
         
                 
-        return item[0],item[1],item[2]
+        return item[0],item[1],item[2],item[3]
 
 
 class PlayerMemoryDataset(Dataset):

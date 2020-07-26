@@ -47,6 +47,7 @@ class CardGame():
         self.turn = 0
         self.suit = None
         self.winning_round = None
+        self.highest_card = -1
         self.history = []
         
 
@@ -61,6 +62,7 @@ class CardGame():
         self.suit = None
         self.round_over = False
         self.history = []
+        self.highest_card = -1
 
         for player in self.playerlist:
 
@@ -117,6 +119,7 @@ class Hearts(CardGame):
         self.hearts_broken = False
         self.first_round = True
         self.shoot_the_moon = None
+        self.queen_of_spades_played = False
         self.MAX_MEM_LEN = 100000
         self.MIN_MEM_LEN = 10000
         self.EPSILON = 0.9
@@ -144,6 +147,7 @@ class Hearts(CardGame):
         self.hearts_broken = False
         self.first_round = True
         self.shoot_the_moon = None
+        self.queen_of_spades_played = False
 
         if self.train:
 
@@ -173,31 +177,218 @@ class Hearts(CardGame):
         
         else:
             
-            if self.suit==None:
+            if player.model=="Heuristic":
+                
+                
+                                    
+                pile = self.get_pile(player.hand)
+                                  
+   
+                if self.suit==None:
+        
 
-                return self.random_card(player.hand)
+                    
+                    
+                    # the case where it is the first turn in the round, qos has not been played but the player does not have the queen
+                    if not self.queen_of_spades_played:
+                        
+                        if player.hand[1,10]==0: #player does not have queen of spades
+                        
+ 
+                            #picking highest spade below the qos
 
-            else:
+                            if len(pile[1][pile[0]==2])>0:
 
-                if np.sum(player.hand[self.suit])==0:
 
-                    return self.random_card(player.hand)
+                                for card in reversed(pile[1][pile[0]==1]):
 
+                                    if card<10:
+
+                                        return 1,card
+
+
+                             #picking best diamond card   
+
+                            if len(pile[1][pile[0]==0])>0:
+
+                                if len(pile[1][pile[0]==0])==1:
+
+                                    return 0,pile[1][pile[0]==0][0]
+
+                                else:
+
+                                    return 0,pile[1][pile[0]==0][1]
+
+                            #picking best club card        
+
+                            elif len(pile[1][pile[0]==3])>0:
+
+                                if len(pile[1][pile[0]==3])==1:
+
+                                    return 3,pile[1][pile[0]==3][0]
+
+                                else:
+
+                                    return 3,pile[1][pile[0]==3][1]
+
+
+                            elif len(pile[1][pile[0]==2])==len(pile[1]) or (len(pile[1][pile[0]==2])>0 and self.hearts_broken==True):
+
+                                return 2,pile[1][pile[0]==2][0]
+
+                            # odd case where all the player has left is king or ace of spades and is leading
+                            else:
+
+                                return 1,pile[1][pile[0]==1][-1]
+
+                                    
+                        else: #if player is leading and player has queen of spades
+                            
+                            
+                            if len(pile[1][pile[0]==0])>0:
+
+                                if len(pile[1][pile[0]==0])==1:
+
+                                    return 0,pile[1][pile[0]==0][0]
+
+                                else:
+
+                                    return 0,pile[1][pile[0]==0][1]
+                        
+                            
+                            if len(pile[1][pile[0]==3])>0:
+
+                                if len(pile[1][pile[0]==3])==1:
+
+                                    return 3,pile[1][pile[0]==3][0]
+
+                                else:
+
+                                    return 3,pile[1][pile[0]==3][1]                            
+                        
+                            
+                            if len(pile[1][pile[0]==2])==len(pile[1]) and self.hearts_broken==True:
+
+                                return 2,pile[1][pile[0]==2][0]
+                            
+                            if pile[1][pile[0]==1][-1]==10 and len(pile[1][pile[0]==1])>1:
+                                
+                                return 1,pile[1][pile[0]==1][-2]
+                            else:
+                                return 1,pile[1][pile[0]==1][-1]
+                                
+                                
+                     # qos already played
+                    else:
+
+                        if len(pile[1][pile[0]==0])>0:
+
+                            if len(pile[1][pile[0]==0])==1:
+
+                                return 0,pile[1][pile[0]==0][0]
+
+                            else:
+
+                                return 0,pile[1][pile[0]==0][1]
+                            
+                        
+                        elif len(pile[1][pile[0]==1])>0:
+
+                            if len(pile[1][pile[0]==1])==1:
+
+                                return 1,pile[1][pile[0]==1][0]
+
+                            else:
+
+                                return 1,pile[1][pile[0]==1][1]
+                            
+                        
+                        elif len(pile[1][pile[0]==3])>0:
+
+                            if len(pile[1][pile[0]==3])==1:
+
+                                return 3,pile[1][pile[0]==3][0]
+
+                            else:
+
+                                return 3,pile[1][pile[0]==3][1]
+                            
+                            
+                        elif len(pile[1][pile[0]==2])>0:
+
+                            return 2,pile[1][pile[0]==2][0]
+
+                    
+                  
+                # someone else led
                 else:
 
-                    available_moves = player.hand.copy()
-                    available_moves[:self.suit] = 0
-                    available_moves[self.suit+1:] = 0
+                    
+                    if len(pile[1][pile[0]==self.suit])>0:
+                        
 
-                    return self.random_card(available_moves)
+                        
+                        for card in reversed(pile[1][pile[0]==self.suit]):
+                            
+                            if card<self.highest_card:
+                                
+                                return self.suit,card
+                            
+                        return self.suit,pile[1][pile[0]==self.suit][-1]
+                        
+                    else:
+                        
+                        if player.hand[1,10]==1:
+                            
+                            return 1,10
+                        
+                        
+                        elif len(pile[1][pile[0]==2])>0:
+                            
+                            return 2,pile[1][pile[0]==2][-1]
+                        
+                        elif len(pile[1][pile[0]==1])>0:
+                            
+                            return 1,pile[1][pile[0]==1][-1]
+                        
+                        elif len(pile[1][pile[0]==0])>0:
+                            
+                            return 0,pile[1][pile[0]==0][-1]
+                        
+                        elif len(pile[1][pile[0]==3])>0:
+                            
+                            return 3,pile[1][pile[0]==3][-1]
+                        
+                        
+                
+                
+            else:
+                
+                game_state, mask, memory = self.nnet_input()
+                
+                with torch.no_grad():
+                    
+                    if np.random.uniform(0,1)>1:
+                        
+                        output = self.playerlist[self.turn].response_nnet(game_state,memory)*mask
+                        
+                    else:
+                        
+                        output = self.strat_nnet(game_state,memory)*mask
+                        
+                prediction = output / torch.sum(output)
+                prediction = prediction.squeeze().numpy()
+                choice = np.argmax(prediction)
+                
+                return int(choice/13), choice%13
    
     
     
     def play_round(self):
         
        
-        previous_b = -1
         self.winning_round = None
+        self.highest_card = -1
         
         
         if self.first_round:
@@ -214,16 +405,17 @@ class Hearts(CardGame):
             
             self.first_round = False
             self.suit = 3
-            previous_b = 0
+            self.highest_card = 0
             self.winning_round = self.turn
             
             self.turn = (self.turn + 1)%self.numplayers
             
         while np.sum(self.table)<self.numplayers:
             
-            if self.train==False:
+            if not self.train:
                 
                 a,b = self.choose_card(self.playerlist[self.turn])
+                
                 
             else:
                 
@@ -236,33 +428,25 @@ class Hearts(CardGame):
                 prediction = output / torch.sum(output)
                 prediction = prediction.squeeze().numpy()
                 
-               
-
-
                 
                 if np.random.uniform(0,1)<self.EPSILON:
                     
 
 
                     choice = np.random.choice(52,p=prediction)
-                    a,b = int(choice/13), choice%13
-
-
-                    
-                    
+                    a,b = int(choice/13), choice%13                   
                     
                 
                 else:
-
-
                     
                     choice = np.argmax(prediction)
                     a,b = int(choice/13), choice%13
 
                     action = torch.zeros((1,52))
                     action[0,choice] = 1
-                    self.memory.append([game_state,memory,action])
+                    self.memory.append([game_state,memory,mask,action])
                 
+
                 action = torch.zeros((1,52))
                 action[0,choice] = 1
  
@@ -288,15 +472,33 @@ class Hearts(CardGame):
             
 #             self.record_history(a,b)
             
-                      
+#             if self.playerlist[self.turn].hand[a,b]==0:
+                
+#                 print('qos was played' if self.queen_of_spades_played else 'qos was not played')
+#                 print(f'when deciding, suit was {self.suit}')
+#                 print('player hand looks like:')
+#                 print(self.playerlist[self.turn].hand)
+#                 print('table looks like:')
+#                 print(self.table)
+#                 print('choice was:')
+#                 print(f'{a}, {b}')
+#                 print('real pile of players hand looks like:')
+#                 print(self.get_pile(self.playerlist[self.turn].hand))
+#                 print(' ') 
+
+
             if self.suit==None:
                 
                 self.suit = a
                 
-
-        
+            
             self.playerlist[self.turn].hand[a,b] = 0
             self.table[a,b] = 1
+            
+            
+            if a==1 and b==10:
+                
+                self.queen_of_spades_played = True
             
             
             if self.hearts_broken==False:
@@ -308,9 +510,9 @@ class Hearts(CardGame):
             
             if a==self.suit:
                 
-                if b>previous_b:
+                if b>self.highest_card:
                     
-                    previous_b = b
+                    self.highest_card = b
                     self.winning_round = self.turn
                     
 
@@ -419,10 +621,7 @@ class Hearts(CardGame):
     def recall_history(self):
         
         return np.zeros((1,13))
-        
-        
-
-                
+              
 
     def nnet_input(self):
     
