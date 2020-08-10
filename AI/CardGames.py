@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from Player import Player
-from NeuralNetworks import Cuore, Gioco
+from NeuralNetworks import Cuore2, Gioco2
 
 
 
@@ -126,15 +126,15 @@ class Hearts(CardGame):
         
         self.memory = deque([], maxlen=self.MAX_MEM_LEN)
         
-        self.strat_nnet = Gioco()
+        self.strat_nnet = Gioco2()
         
         for player in self.playerlist:
             
             player.hearts = 0
             player.queen_of_spades = 0
             
-            player.response_nnet = Cuore()
-            player.best_response_nnet = Cuore()
+            player.response_nnet = Cuore2()
+            player.best_response_nnet = Cuore2()
             
             player.memory = deque([], maxlen=self.MAX_MEM_LEN)
             player.train_examples = []
@@ -177,7 +177,24 @@ class Hearts(CardGame):
         
         else:
             
-            if player.model=="Heuristic":
+            if player.model=="Random":
+
+                if np.sum(player.hand[self.suit])==0 or self.suit==None:
+
+
+                    return self.random_card(player.hand)
+
+                else:
+
+                    hand = player.hand.copy()
+
+                    hand[:self.suit] = 0
+                    hand[self.suit+1:] = 0
+                    
+
+                    return self.random_card(hand)
+
+            elif player.model=="Heuristic":
                 
                 
                                     
@@ -365,21 +382,26 @@ class Hearts(CardGame):
             else:
                 
                 game_state, mask, memory = self.nnet_input()
+
                 
                 with torch.no_grad():
                     
-                    if np.random.uniform(0,1)>1:
+                    # if np.random.uniform(0,1)>1:
                         
-                        output = self.playerlist[self.turn].response_nnet(game_state,memory)*mask
+                    output = self.playerlist[self.turn].response_nnet(game_state.unsqueeze(0),memory)*mask
                         
-                    else:
+                    # else:
                         
-                        output = self.strat_nnet(game_state,memory)*mask
-                        
+                    # output = self.strat_nnet(game_state.unsqueeze(0),memory)*mask
+                
+
                 prediction = output / torch.sum(output)
                 prediction = prediction.squeeze().numpy()
+
                 choice = np.argmax(prediction)
+
                 
+
                 return int(choice/13), choice%13
    
     
@@ -411,10 +433,12 @@ class Hearts(CardGame):
             self.turn = (self.turn + 1)%self.numplayers
             
         while np.sum(self.table)<self.numplayers:
+
             
             if not self.train:
                 
                 a,b = self.choose_card(self.playerlist[self.turn])
+
                 
                 
             else:
@@ -422,7 +446,7 @@ class Hearts(CardGame):
                 game_state, mask, memory = self.nnet_input()
                 
                 with torch.no_grad():
-                    output = self.playerlist[self.turn].response_nnet(game_state,memory)*mask
+                    output = self.playerlist[self.turn].response_nnet(game_state.unsqueeze(0),memory)*mask
                 
 
                 prediction = output / torch.sum(output)
@@ -433,7 +457,7 @@ class Hearts(CardGame):
                     
 
 
-                    choice = np.random.choice(52,p=prediction)
+                    choice = np.random.choice(52)
                     a,b = int(choice/13), choice%13                   
                     
                 
@@ -598,17 +622,20 @@ class Hearts(CardGame):
             if self.hearts_broken or np.sum(self.playerlist[self.turn].hand[2])==np.sum(self.playerlist[self.turn].hand):
                 
                 return torch.reshape(torch.tensor(mask),(1,-1))
+                # return torch.tensor(mask).unsqueeze(0)
             
             else:
                 
                 mask[2] = 0
                 
                 return torch.reshape(torch.tensor(mask),(1,-1))
+                # return torch.tensor(mask).unsqueeze(0)
         
         
         elif np.sum(self.playerlist[self.turn].hand[self.suit])==0:
             
             return torch.reshape(torch.tensor(mask),(1,-1))
+            # return torch.tensor(mask).unsqueeze(0)
                   
         else:
             
@@ -616,22 +643,46 @@ class Hearts(CardGame):
             mask[self.suit+1:] = 0
             
             return torch.reshape(torch.tensor(mask),(1,-1))
+            # return torch.tensor(mask).unsqueeze(0)
         
     
     def recall_history(self):
         
         return np.zeros((1,13))
+
+    def create_blank(self):
+    
+        return torch.zeros((16,16))
               
 
     def nnet_input(self):
     
-        game_state = [self.playerlist[(i+self.turn)%self.numplayers].reserve.copy() for i in range(self.numplayers)]
-        game_state.append(self.playerlist[self.turn].hand.copy())
-        game_state.append(self.table.copy())
+        # game_state = [self.playerlist[(i+self.turn)%self.numplayers].reserve.copy() for i in range(self.numplayers)]
+        # game_state.append(self.playerlist[self.turn].hand.copy())
+        # game_state.append(self.table.copy())
         
+        # memory = self.recall_history()
+        # game_state.append(memory) #get rid of this once RNN is up and running
+        # game_state = torch.reshape(torch.tensor(np.concatenate(game_state)).float(),(1,-1))
+
+        hand = self.create_blank()
+        hand[6:10,1:14] = torch.tensor(self.playerlist[self.turn].hand)
+        hand = hand.unsqueeze(0)
+    
+        table = self.create_blank()
+        table[6:10,1:14] = torch.tensor(self.table)
+        table = table.unsqueeze(0)
+
+        game_state = torch.cat((hand,table))
+
         memory = self.recall_history()
-        game_state.append(memory) #get rid of this once RNN is up and running
-        game_state = torch.reshape(torch.tensor(np.concatenate(game_state)).float(),(1,-1))
+
+        for i in range(self.numplayers):
+
+            reserve = self.create_blank()
+            reserve[6:10,1:14] = torch.tensor(self.playerlist[(i+self.turn)%self.numplayers].reserve)
+            reserve = reserve.unsqueeze(0)
+            game_state = torch.cat((game_state,reserve))
         
         mask = self.get_mask()
         

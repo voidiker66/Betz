@@ -59,3 +59,132 @@ class Gioco(torch.nn.Module):
         x = torch.sigmoid(self.OL(x))
                
         return x
+
+
+
+
+
+
+
+
+
+
+class Cuore2(nn.Module):
+    def __init__(self):
+        super(Cuore2, self).__init__()
+        
+        
+        self.Conv1 = nn.Conv2d(6,16,3)
+        self.Conv2 = nn.Conv2d(16,32,3)
+        self.Conv3 = nn.Conv2d(32,64,2)
+
+        self.bnorm1 = nn.BatchNorm2d(16)
+        self.bnorm2 = nn.BatchNorm2d(32)
+        self.bnorm3 = nn.BatchNorm1d(1000)
+        self.bnorm4 = nn.BatchNorm1d(500)
+        self.bnorm5 = nn.BatchNorm1d(100)
+     
+        self.pool = nn.MaxPool2d(2,2)#,return_indices=True)
+
+        self.fc1 = nn.Linear(1600, 1000)
+        self.fc2 = nn.Linear(1000,500)
+        self.fc3 = nn.Linear(500,100)
+        self.fc4 = nn.Linear(100,52)
+
+        
+        # self.ConvTrans3 = nn.ConvTranspose2d(64,32,2)
+        # self.ConvTrans2 = nn.ConvTranspose2d(32,16,3)
+        # self.ConvTrans1 = nn.ConvTranspose2d(16,1,3)
+        
+        # self.unpool = nn.MaxUnpool2d(2,2)
+
+        
+        
+
+    def forward(self, game_state, memory):
+        
+        x = self.Conv1(game_state)
+        x = F.relu(self.bnorm1(x))
+        x = self.Conv2(x)
+        x = F.relu(self.bnorm2(x))
+        x = self.pool(x)
+        x = self.Conv3(x)
+
+        x = x.view(-1,1,1600)
+
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.fc2(x)
+        x = F.relu(x)
+        x = self.fc3(x)
+        x = F.relu(x)
+        x = self.fc4(x)
+
+        # x = self.ConvTrans3(x)
+        # x = self.unpool(x,indices)
+        # x = F.relu(nn.BatchNorm2d(x))
+        # x = self.ConvTrans2(x)
+        # x = F.relu(nn.BatchNorm2d(x))
+        # x = self.ConvTrans1(x)
+        # print(x)
+        
+        return F.relu(x) + (0.00001 * torch.ones((1,52)))
+
+
+
+class Gioco2(nn.Module):
+    def __init__(self):
+        super(Gioco2, self).__init__()
+               
+        self.Conv1 = nn.Conv2d(6,16,3)
+        self.Conv2 = nn.Conv2d(16,32,3)
+        self.Conv3 = nn.Conv2d(32,64,2)
+
+        self.bnorm1 = nn.BatchNorm2d(16)
+        self.bnorm2 = nn.BatchNorm2d(32)
+     
+        self.pool = nn.MaxPool2d(2,2)#,return_indices=True)
+
+        self.fc1 = nn.Linear(1600, 1000)
+        self.fc2 = nn.Linear(1000,500)
+        self.fc3 = nn.Linear(500,100)
+        self.fc4 = nn.Linear(100,52)
+
+        
+        # self.ConvTrans3 = nn.ConvTranspose2d(64,32,2)
+        # self.ConvTrans2 = nn.ConvTranspose2d(32,16,3)
+        # self.ConvTrans1 = nn.ConvTranspose2d(16,1,3)
+        
+        # self.unpool = nn.MaxUnpool2d(2,2)
+
+        
+        
+
+    def forward(self, game_state, memory):
+        
+        x = self.Conv1(game_state)
+        x = F.relu(self.bnorm1(x))
+        x = self.Conv2(x)
+        x = F.relu(self.bnorm2(x))
+        x = self.pool(x)
+        x = self.Conv3(x)
+
+        x = x.view(-1,1,1600)
+
+        x = self.fc1(x)
+        x = F.relu(x)
+        x = self.fc2(x)
+        x = F.relu(x)
+        x = self.fc3(x)
+        x = F.relu(x)
+        x = self.fc4(x)
+
+        # x = self.ConvTrans3(x)
+        # x = self.unpool(x,indices)
+        # x = F.relu(nn.BatchNorm2d(x))
+        # x = self.ConvTrans2(x)
+        # x = F.relu(nn.BatchNorm2d(x))
+        # x = self.ConvTrans1(x)
+        # print(x)
+        
+        return torch.sigmoid(x)

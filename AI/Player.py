@@ -15,7 +15,7 @@ class Player():
         self.points = 0
         self.round_points = 0
         self.human = human
-        self.model = 'Heuristic'
+        self.model = 'Random'
 
         
         self.deckshape = deckshape
