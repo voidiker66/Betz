@@ -118,11 +118,12 @@ class Hearts(CardGame):
         self.train = train
         self.hearts_broken = False
         self.first_round = True
+        self.last_round = False
         self.shoot_the_moon = None
         self.queen_of_spades_played = False
         self.MAX_MEM_LEN = 100000
         self.MIN_MEM_LEN = 10000
-        self.EPSILON = 0.9
+        self.EPSILON = 1
         
         self.memory = deque([], maxlen=self.MAX_MEM_LEN)
         
@@ -146,6 +147,7 @@ class Hearts(CardGame):
         
         self.hearts_broken = False
         self.first_round = True
+        self.last_round = False
         self.shoot_the_moon = None
         self.queen_of_spades_played = False
 
@@ -154,6 +156,7 @@ class Hearts(CardGame):
             for player in self.playerlist:
 
                 player.points = 0
+                player.train_examples = []
         
         
     def check_for_2clubs(self):
@@ -431,16 +434,16 @@ class Hearts(CardGame):
             self.winning_round = self.turn
             
             self.turn = (self.turn + 1)%self.numplayers
+
+
             
         while np.sum(self.table)<self.numplayers:
 
-            
             if not self.train:
                 
                 a,b = self.choose_card(self.playerlist[self.turn])
 
-                
-                
+                          
             else:
                 
                 game_state, mask, memory = self.nnet_input()
@@ -456,8 +459,7 @@ class Hearts(CardGame):
                 if np.random.uniform(0,1)<self.EPSILON:
                     
 
-
-                    choice = np.random.choice(52)
+                    choice = np.random.choice(np.nonzero(prediction)[0])
                     a,b = int(choice/13), choice%13                   
                     
                 
@@ -477,12 +479,14 @@ class Hearts(CardGame):
 
                 if len(self.playerlist[self.turn].train_examples)>0:
                     
-                    self.playerlist[self.turn].train_examples[-1][4] = torch.max(output)
-                                
+                    maxq = torch.max(output.reshape((1,-1))*mask)
+ 
+                    self.playerlist[self.turn].train_examples[-1][4] = maxq
 
 
 
-                if len(self.playerlist[self.turn].train_examples)<12:
+
+                if not self.last_round:
                 
                     self.playerlist[self.turn].train_examples.append([
                                     game_state
@@ -491,31 +495,21 @@ class Hearts(CardGame):
                                     ,None # reward
                                     ,None # max q'
                                     ])     
-                
 
-            
-#             self.record_history(a,b)
-            
-#             if self.playerlist[self.turn].hand[a,b]==0:
-                
-#                 print('qos was played' if self.queen_of_spades_played else 'qos was not played')
-#                 print(f'when deciding, suit was {self.suit}')
-#                 print('player hand looks like:')
-#                 print(self.playerlist[self.turn].hand)
-#                 print('table looks like:')
-#                 print(self.table)
-#                 print('choice was:')
-#                 print(f'{a}, {b}')
-#                 print('real pile of players hand looks like:')
-#                 print(self.get_pile(self.playerlist[self.turn].hand))
-#                 print(' ') 
+
 
 
             if self.suit==None:
                 
                 self.suit = a
-                
-            
+
+            # if self.playerlist[self.turn].hand[a,b]==0:
+            #     print(prediction.reshape((4,13)))
+            #     print(np.nonzero(prediction))
+            #     print(np.random.choice(np.nonzero(prediction)[0]))
+
+            #     print('')
+
             self.playerlist[self.turn].hand[a,b] = 0
             self.table[a,b] = 1
             
@@ -538,27 +532,32 @@ class Hearts(CardGame):
                     
                     self.highest_card = b
                     self.winning_round = self.turn
-                    
 
-                    
-                    
-            
+
             self.turn = (self.turn + 1)%self.numplayers
-            
+
+ 
+
+
         self.playerlist[self.winning_round].reserve += self.table
         self.table = np.zeros(self.deckshape)
         self.turn = self.winning_round
         self.winning_round = None  
         self.suit = None
-        
+
+
         if np.sum(self.playerlist[0].hand)==0:
-            
+
             self.score_round()
-            
-            
+                  
             self.round_over = True
-            
-            
+        
+        elif np.sum(self.playerlist[0].hand)==1:
+
+            self.last_round = True
+
+
+
             
     def score_round(self):
         
@@ -594,10 +593,12 @@ class Hearts(CardGame):
         if self.train:      
             
             for player in self.playerlist:
+
                     
                 for x in player.train_examples:
-
-                    player.memory.append([x[0],x[1],x[2],torch.tensor((26-player.round_points)/13),x[4]])
+                    
+                    
+                    player.memory.append([x[0],x[1],x[2],torch.tensor((-1*player.round_points)/13),x[4]])
                 
                 
     def record_history(self,a,b):
@@ -620,35 +621,38 @@ class Hearts(CardGame):
         if self.suit==None:
             
             if self.hearts_broken or np.sum(self.playerlist[self.turn].hand[2])==np.sum(self.playerlist[self.turn].hand):
+
                 
                 return torch.reshape(torch.tensor(mask),(1,-1))
-                # return torch.tensor(mask).unsqueeze(0)
             
             else:
                 
                 mask[2] = 0
+
                 
                 return torch.reshape(torch.tensor(mask),(1,-1))
-                # return torch.tensor(mask).unsqueeze(0)
+
         
         
         elif np.sum(self.playerlist[self.turn].hand[self.suit])==0:
+
             
             return torch.reshape(torch.tensor(mask),(1,-1))
-            # return torch.tensor(mask).unsqueeze(0)
+
                   
         else:
             
             mask[:self.suit] = 0
             mask[self.suit+1:] = 0
+
             
             return torch.reshape(torch.tensor(mask),(1,-1))
-            # return torch.tensor(mask).unsqueeze(0)
+
         
     
     def recall_history(self):
         
-        return np.zeros((1,13))
+        return torch.zeros((1,13))
 
     def create_blank(self):
     

@@ -90,15 +90,7 @@ class Cuore2(nn.Module):
         self.fc2 = nn.Linear(1000,500)
         self.fc3 = nn.Linear(500,100)
         self.fc4 = nn.Linear(100,52)
-
-        
-        # self.ConvTrans3 = nn.ConvTranspose2d(64,32,2)
-        # self.ConvTrans2 = nn.ConvTranspose2d(32,16,3)
-        # self.ConvTrans1 = nn.ConvTranspose2d(16,1,3)
-        
-        # self.unpool = nn.MaxUnpool2d(2,2)
-
-        
+     
         
 
     def forward(self, game_state, memory):
@@ -120,15 +112,8 @@ class Cuore2(nn.Module):
         x = F.relu(x)
         x = self.fc4(x)
 
-        # x = self.ConvTrans3(x)
-        # x = self.unpool(x,indices)
-        # x = F.relu(nn.BatchNorm2d(x))
-        # x = self.ConvTrans2(x)
-        # x = F.relu(nn.BatchNorm2d(x))
-        # x = self.ConvTrans1(x)
-        # print(x)
         
-        return F.relu(x) + (0.00001 * torch.ones((1,52)))
+        return x 
 
 
 

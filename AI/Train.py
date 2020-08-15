@@ -18,8 +18,8 @@ CURRENT_DIR = path.abspath(path.curdir)
 NAME_WHEEL = ['Lain','Turing','Tesla','Silver']
 BATCH_SIZE = 1024
 MINIBATCH_SIZE = 64
-DECAY = 0.995
-DISCOUNT = 0.9
+DECAY = 0.999
+DISCOUNT = 0.99
 
 game_counter = 0
 batch_counter = 0
@@ -41,12 +41,12 @@ else:
 
 
 
-game.optimizer = torch.optim.Adam(game.strat_nnet.parameters(),lr=0.0001)
+game.optimizer = torch.optim.Adam(game.strat_nnet.parameters(),lr=0.001)
 
 for i,player in enumerate(game.playerlist):
     
     player.name = NAME_WHEEL[i]
-    player.optimizer = torch.optim.Adam(player.response_nnet.parameters(),lr=0.01)
+    player.optimizer = torch.optim.Adam(player.response_nnet.parameters(),lr=0.001)
     
     player_model_directory = os.listdir(CURRENT_DIR + f'/Models/{player.name}/Versions/')
 
@@ -69,7 +69,7 @@ for i,player in enumerate(game.playerlist):
 
 
 
-while batch_counter<1000:
+while batch_counter<4000:
 
     while not game.round_over:
 
@@ -81,7 +81,7 @@ while batch_counter<1000:
     shuffle(game.playerlist)
 
 
-    if len(game.memory)>game.MIN_MEM_LEN and game_counter%1000==0:
+    if len(game.playerlist[0].memory)>game.MIN_MEM_LEN and game_counter%1000==0:
 
         batch_counter += 1
 
@@ -89,78 +89,102 @@ while batch_counter<1000:
         game.EPSILON = max(game.EPSILON*DECAY,0.05)
 
 
-        batch = random.sample(list(game.memory),BATCH_SIZE)
-        dataset = GameMemoryDataset(batch)
-        dataloader = DataLoader(
-                        dataset, 
-                        batch_size=MINIBATCH_SIZE,
-                        shuffle=True
-                        )
-    
-        for game_state,memory,mask,action in dataloader:
-
-            prediction = game.strat_nnet(game_state,memory)
+        if len(game.memory)>game.MIN_MEM_LEN:
 
 
-            ideal_prediction = torch.where(mask==1,action,prediction)    
+            game_batch = random.sample(list(game.memory),BATCH_SIZE)
+            game_dataset = GameMemoryDataset(game_batch)
+            game_dataloader = DataLoader(
+                            game_dataset, 
+                            batch_size=MINIBATCH_SIZE,
+                            shuffle=True
+                            )
+        
+            for game_state,memory,mask,action in game_dataloader:
 
-            game.optimizer.zero_grad()
+                game.optimizer.zero_grad()
+
+                prediction = game.strat_nnet(game_state,memory)
 
 
-            output = torch.mean((ideal_prediction - prediction)**2)
-            output.backward()       
-            game.optimizer.step()  
+                ideal_prediction = torch.where(mask==1,action,prediction)    
 
-        game.version += 1
+
+                output = torch.mean((ideal_prediction - prediction)**2)
+                output.backward()       
+                game.optimizer.step()  
+
+            game.version += 1
 
         
-        torch.save(game.strat_nnet.state_dict(),CURRENT_DIR + f'/Models/Gamma/GNet {game.version}')
+            torch.save(game.strat_nnet.state_dict(),CURRENT_DIR + f'/Models/Gamma/GNet {game.version}')
+
+
+
+        avg_loss = 0
 
         for player in game.playerlist:
         
             batch = random.sample(player.memory,BATCH_SIZE)
+
+
             dataset = PlayerMemoryDataset(batch)
+
             dataloader = DataLoader(
                             dataset, 
                             batch_size=MINIBATCH_SIZE,
                             shuffle=True
                             )
+
+            temp_loss = 0
+
             
             for game_state, memory, action, reward, maxq in dataloader:
 
+                player.optimizer.zero_grad()
 
                 prediction = player.response_nnet(game_state,memory)
                 ideal_qs = reward + (DISCOUNT * maxq)
                 ideal_prediction = prediction.clone()
 
+                # print(torch.mean(ideal_qs))
 
-
-                test = reward + DISCOUNT*maxq
 
                 for i in range(MINIBATCH_SIZE):
 
                     choice = np.argmax(action[i])
 
 
-                    ideal_prediction[i,0,choice] = test[i]
-
-
-                player.optimizer.zero_grad()
+                    ideal_prediction[i,0,choice] = ideal_qs[i]
 
 
                 loss = torch.mean((ideal_prediction - prediction)**2)
+
+                  
+
                 loss.backward()
 
                 player.optimizer.step()
 
+                temp_loss += loss
+
+            temp_loss /= (1024/64)
+
+            avg_loss += temp_loss
+
             player.version += 1
 
             torch.save(player.response_nnet.state_dict(),CURRENT_DIR + f'/Models/{player.name}/Versions/QNet {player.version}')
-            torch.save(player.response_nnet.state_dict(),CURRENT_DIR + f'/Models/{player.name}/QNet Prime')  
-            player.best_response_nnet.load_state_dict(torch.load(CURRENT_DIR + f'/Models/{player.name}/QNet Prime'))          
+
+            if batch_counter%25==0 or batch_counter==1:
+                torch.save(player.response_nnet.state_dict(),CURRENT_DIR + f'/Models/{player.name}/QNet Prime')  
+                player.best_response_nnet.load_state_dict(torch.load(CURRENT_DIR + f'/Models/{player.name}/QNet Prime'))          
 
 
-        print(f'Batch {batch_counter} completed {datetime.now()}')
+
+        avg_loss /= 4
+
+        print(f'Batch {batch_counter} completed {datetime.now()} with an avg loss of {avg_loss}')
 
 
 

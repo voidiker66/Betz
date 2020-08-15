@@ -30,10 +30,13 @@ class PlayerMemoryDataset(Dataset):
         
     def __getitem__(self,index):
 
+
         if torch.is_tensor(index):
             index = index.tolist()
 
+
         item = self.data[index]
-        
+
+
                 
         return item[0],item[1],item[2],item[3],item[4]
