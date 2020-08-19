@@ -18,8 +18,10 @@ CURRENT_DIR = path.abspath(path.curdir)
 NAME_WHEEL = ['Lain','Turing','Tesla','Silver']
 BATCH_SIZE = 1024
 MINIBATCH_SIZE = 64
-DECAY = 0.999
-DISCOUNT = 0.99
+DECAY = 0.99
+DISCOUNT = 0.97
+EPSILON = 0.08
+MIN_EPSILON = 0.01
 
 game_counter = 0
 batch_counter = 0
@@ -27,6 +29,7 @@ batch_counter = 0
 
 
 game = Hearts(train=True)
+game.EPSILON = EPSILON
 
 game_model_directory = os.listdir(CURRENT_DIR + f'/Models/Gamma/')
 
@@ -41,12 +44,12 @@ else:
 
 
 
-game.optimizer = torch.optim.Adam(game.strat_nnet.parameters(),lr=0.001)
+game.optimizer = torch.optim.SGD(game.strat_nnet.parameters(),lr=0.01,momentum=0)
 
 for i,player in enumerate(game.playerlist):
     
     player.name = NAME_WHEEL[i]
-    player.optimizer = torch.optim.Adam(player.response_nnet.parameters(),lr=0.001)
+    player.optimizer = torch.optim.SGD(player.response_nnet.parameters(),lr=0.1,momentum=0)
     
     player_model_directory = os.listdir(CURRENT_DIR + f'/Models/{player.name}/Versions/')
 
@@ -69,7 +72,7 @@ for i,player in enumerate(game.playerlist):
 
 
 
-while batch_counter<4000:
+while batch_counter<1000:
 
     while not game.round_over:
 
@@ -86,7 +89,7 @@ while batch_counter<4000:
         batch_counter += 1
 
 
-        game.EPSILON = max(game.EPSILON*DECAY,0.05)
+        game.EPSILON = max(game.EPSILON*DECAY,MIN_EPSILON)
 
 
         if len(game.memory)>game.MIN_MEM_LEN:
@@ -138,7 +141,7 @@ while batch_counter<4000:
 
             temp_loss = 0
 
-            
+
             for game_state, memory, action, reward, maxq in dataloader:
 
                 player.optimizer.zero_grad()
@@ -160,7 +163,7 @@ while batch_counter<4000:
 
                 loss = torch.mean((ideal_prediction - prediction)**2)
 
-                  
+                
 
                 loss.backward()
 
@@ -168,7 +171,8 @@ while batch_counter<4000:
 
                 temp_loss += loss
 
-            temp_loss /= (1024/64)
+
+            temp_loss /= (BATCH_SIZE/MINIBATCH_SIZE)
 
             avg_loss += temp_loss
 
@@ -176,7 +180,7 @@ while batch_counter<4000:
 
             torch.save(player.response_nnet.state_dict(),CURRENT_DIR + f'/Models/{player.name}/Versions/QNet {player.version}')
 
-            if batch_counter%25==0 or batch_counter==1:
+            if batch_counter%50==0:
                 torch.save(player.response_nnet.state_dict(),CURRENT_DIR + f'/Models/{player.name}/QNet Prime')  
                 player.best_response_nnet.load_state_dict(torch.load(CURRENT_DIR + f'/Models/{player.name}/QNet Prime'))          
 
@@ -185,11 +189,5 @@ while batch_counter<4000:
         avg_loss /= 4
 
         print(f'Batch {batch_counter} completed {datetime.now()} with an avg loss of {avg_loss}')
-
-
-
-            
-
-
 
 

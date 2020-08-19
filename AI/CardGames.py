@@ -51,9 +51,6 @@ class CardGame():
         self.history = []
         
 
-        
-                
-
  
     def reset(self):
         
@@ -139,6 +136,7 @@ class Hearts(CardGame):
             
             player.memory = deque([], maxlen=self.MAX_MEM_LEN)
             player.train_examples = []
+            player.reward = 0
 
             
         
@@ -157,6 +155,7 @@ class Hearts(CardGame):
 
                 player.points = 0
                 player.train_examples = []
+                player.reward = 0
         
         
     def check_for_2clubs(self):
@@ -398,9 +397,14 @@ class Hearts(CardGame):
                     # output = self.strat_nnet(game_state.unsqueeze(0),memory)*mask
                 
 
-                prediction = output / torch.sum(output)
-                prediction = prediction.squeeze().numpy()
+                output = (output - torch.min(output)*torch.ones((1,52)) + 0.001*torch.ones((1,52))).squeeze()*mask
+                prediction = output.squeeze().numpy()
 
+                # if self.turn==0:
+                #     print(self.table)
+                #     print(prediction.reshape((4,13)))
+                #     print('')
+                    
                 choice = np.argmax(prediction)
 
                 
@@ -422,13 +426,13 @@ class Hearts(CardGame):
             self.dealer = (self.dealer + 1)%self.numplayers
             
             self.turn = self.check_for_2clubs()
+
             
-            self.record_history(3,0)
+            # self.record_history(3,0)
 
             self.playerlist[self.turn].hand[3,0] = 0
             self.table[3,0] = 1
             
-            self.first_round = False
             self.suit = 3
             self.highest_card = 0
             self.winning_round = self.turn
@@ -450,21 +454,21 @@ class Hearts(CardGame):
                 
                 with torch.no_grad():
                     output = self.playerlist[self.turn].response_nnet(game_state.unsqueeze(0),memory)*mask
-                
 
-                prediction = output / torch.sum(output)
-                prediction = prediction.squeeze().numpy()
-                
+                output = (output - (torch.min(output) - 0.001)*torch.ones((1,52))).squeeze()*mask
+                prediction = output.squeeze().numpy()
+
+
                 
                 if np.random.uniform(0,1)<self.EPSILON:
-                    
 
-                    choice = np.random.choice(np.nonzero(prediction)[0])
-                    a,b = int(choice/13), choice%13                   
+
+                    choice = np.random.choice(np.nonzero(mask)[:,1])
+                    a,b = int(choice/13), choice%13 
                     
                 
                 else:
-                    
+
                     choice = np.argmax(prediction)
                     a,b = int(choice/13), choice%13
 
@@ -479,7 +483,9 @@ class Hearts(CardGame):
 
                 if len(self.playerlist[self.turn].train_examples)>0:
                     
-                    maxq = torch.max(output.reshape((1,-1))*mask)
+                    with torch.no_grad():
+                        next_qs = self.playerlist[self.turn].best_response_nnet(game_state.unsqueeze(0),memory)*mask
+                        maxq = torch.max(torch.where(next_qs==0.,torch.tensor(-26.,dtype=torch.float64),next_qs))
  
                     self.playerlist[self.turn].train_examples[-1][4] = maxq
 
@@ -492,9 +498,10 @@ class Hearts(CardGame):
                                     game_state
                                     ,memory
                                     ,action
-                                    ,None # reward
-                                    ,None # max q'
-                                    ])     
+                                    ,0 # reward
+                                    ,0 # max q'
+                                    ])
+ 
 
 
 
@@ -503,12 +510,7 @@ class Hearts(CardGame):
                 
                 self.suit = a
 
-            # if self.playerlist[self.turn].hand[a,b]==0:
-            #     print(prediction.reshape((4,13)))
-            #     print(np.nonzero(prediction))
-            #     print(np.random.choice(np.nonzero(prediction)[0]))
 
-            #     print('')
 
             self.playerlist[self.turn].hand[a,b] = 0
             self.table[a,b] = 1
@@ -540,10 +542,35 @@ class Hearts(CardGame):
 
 
         self.playerlist[self.winning_round].reserve += self.table
+        self.playerlist[self.winning_round].reward = -1 * (np.sum(self.table[2]) + 13 * self.table[1,10])
         self.table = np.zeros(self.deckshape)
         self.turn = self.winning_round
         self.winning_round = None  
         self.suit = None
+
+        if self.train:
+                
+            if self.last_round:
+
+                for player in self.playerlist:
+
+                    player.train_examples[-1][3] += player.reward
+                    player.reward = 0
+            
+            else:
+
+                for player in self.playerlist:
+
+                    if len(player.train_examples)>0:
+
+                        player.train_examples[-1][3] = player.reward
+                    
+                    player.reward = 0
+
+
+        if self.first_round:
+
+            self.first_round = False
 
 
         if np.sum(self.playerlist[0].hand)==0:
@@ -572,7 +599,7 @@ class Hearts(CardGame):
                 
                 self.shoot_the_moon = i
                 
-        if self.shoot_the_moon!=None:
+        if False:#self.shoot_the_moon!=None:
             
             for i,player in enumerate(self.playerlist):
                 
@@ -589,6 +616,7 @@ class Hearts(CardGame):
             for player in self.playerlist:
                 
                 player.points += player.round_points
+
                 
         if self.train:      
             
@@ -596,9 +624,9 @@ class Hearts(CardGame):
 
                     
                 for x in player.train_examples:
+
                     
-                    
-                    player.memory.append([x[0],x[1],x[2],torch.tensor((-1*player.round_points)/13),x[4]])
+                    player.memory.append([x[0],x[1],x[2],torch.tensor(x[3],dtype=torch.long),x[4]])
                 
                 
     def record_history(self,a,b):

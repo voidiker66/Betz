@@ -16,3 +16,6 @@ for name in NAME_WHEEL:
     for file in os.listdir(CURRENT_DIR + f'/Models/{name}/Versions/'):
 
         os.remove(CURRENT_DIR + f'/Models/{name}/Versions/' + file)
+
+
+print('files deleted')
